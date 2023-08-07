@@ -7,21 +7,26 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { WsGuard } from 'src/common/guards/websocket.guard';
-import { ACCESS_TOKEN_SECRET_KEY } from 'src/constants';
-import { TokenHelper } from 'src/helpers';
 
-import { ChatRoomsService } from '../chat-rooms/chat-rooms.service';
-import { MessagesService } from '../messages/messages.service';
-
+import { JwtService } from '@nestjs/jwt';
+import axios from 'axios';
+import { BACKEND_SERVICE } from 'src/constants/base.constant';
+import { JWT_KEY } from 'src/constants/jwt.constant';
+import { HttpService } from '../http/http.service';
 import { SocketService } from './socket.service';
 
 @WebSocketGateway({ namespace: 'room' })
 export class SocketGateway implements OnModuleInit {
   constructor(
-    private readonly messagesService: MessagesService,
-    private readonly chatRoomsService: ChatRoomsService,
-    private socketService: SocketService,
+    private readonly socketService: SocketService,
+    private readonly jwtService: JwtService,
+    private readonly httpService: HttpService,
   ) {}
+
+  // headers: {
+  //   'Content-Type': 'application/json',
+  //   Authorization: 'JWT fefege...',
+  // },
 
   @WebSocketServer() public server: Server;
 
@@ -36,16 +41,31 @@ export class SocketGateway implements OnModuleInit {
 
   onModuleInit() {
     this.server.on('connection', async (socket) => {
-      let bearerToken = socket.handshake.auth.token || socket.handshake.headers.authorization;
+      console.log('init');
+
+      const ans = await this.httpService.post(
+        `${BACKEND_SERVICE}/api/v1/auth/login`,
+        {
+          headers: {},
+          params: {},
+          body: {
+            emailOrPhone: 'admin@gmail.com',
+            password: 'admin',
+          },
+        },
+      );
+      console.log(ans);
+
+      let bearerToken =
+        socket.handshake.auth.token || socket.handshake.headers.authorization;
       bearerToken = bearerToken?.split(' ')[1];
-      if(!bearerToken) {
+      if (!bearerToken) {
         this.server.disconnectSockets();
         return;
       }
-      const payload: any = await TokenHelper.verify(
-        bearerToken,
-        ACCESS_TOKEN_SECRET_KEY,
-      );
+      const payload = await this.jwtService.verifyAsync(bearerToken, {
+        secret: JWT_KEY,
+      });
       console.log('join ' + payload.id);
       socket.join(payload.id.toString());
     });
@@ -56,72 +76,7 @@ export class SocketGateway implements OnModuleInit {
   @SubscribeMessage('send-message')
   async chatMesage(@MessageBody() data: any, @Request() req) {
     const { receiverId, ...createMessageDto } = data;
-    createMessageDto['userId'] = req['user'].id;
-    const newMessage = await this.messagesService.createMessage(
-      createMessageDto,
-    );
-    if (!newMessage) {
-      this.server.emit('error');
-    } else {
-      const chatRoom = await this.chatRoomsService.getDetailByProfile(
-        createMessageDto.roomId,
-        receiverId,
-      );
-      this.server.emit('receive-chat-room', chatRoom);
-      this.server.emit('receive-message', newMessage);
-    }
-  }
 
-  @UseGuards(WsGuard)
-  @SubscribeMessage('update-message')
-  async updateMessage(@MessageBody() data: any, @Request() req) {
-    const { messageId, receiverId, ...updateMessageDto } = data;
-    updateMessageDto['userId'] = req['user'].id;
-    const message = await this.messagesService.updateMessage(
-      messageId,
-      updateMessageDto,
-    );
-    if (!message) {
-      this.server.emit('error');
-    } else {
-      this.server.emit('receive-message', message);
-    }
+    // this.server.emit('receive-message', newMessage);
   }
-
-  @UseGuards(WsGuard)
-  @SubscribeMessage('delete-message')
-  async deleteMessage(@MessageBody() data: any, @Request() req) {
-    const { roomId, messageId, receiverId } = data;
-    const message = await this.messagesService.deleteMessage(messageId, {
-      userId: req['user'].id,
-      roomId: roomId,
-    });
-    if (!message) {
-      this.server.emit('error');
-    } else {
-      this.server.emit('receive-message-after-deleting', message);
-    }
-  }
-
-  @UseGuards(WsGuard)
-  @SubscribeMessage('typing')
-  handleTyping(@MessageBody() data: any, @Request() req) {
-    console.log('typing');
-  }
-
-  // noti realtime
-  // @UseGuards(WsGuard)
-  // @SubscribeMessage('delete-message')
-  // async (@MessageBody() data: any, @Request() req) {
-  //   const { roomId, messageId, receiverId } = data;
-  //   const message = await this.messagesService.deleteMessage(messageId, {
-  //     userId: req['user'].id,
-  //     roomId: roomId,
-  //   });
-  //   if (!message) {
-  //     this.server.emit('error');
-  //   } else {
-  //     this.server.emit('receive-message', message);
-  //   }
-  // }
 }
