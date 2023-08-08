@@ -43,18 +43,18 @@ export class SocketGateway implements OnModuleInit {
     this.server.on('connection', async (socket) => {
       console.log('init');
 
-      const ans = await this.httpService.post(
-        `${BACKEND_SERVICE}/api/v1/auth/login`,
-        {
-          headers: {},
-          params: {},
-          body: {
-            emailOrPhone: 'admin@gmail.com',
-            password: 'admin',
-          },
-        },
-      );
-      console.log(ans);
+      // const ans = await this.httpService.post(
+      //   `${BACKEND_SERVICE}/api/v1/auth/login`,
+      //   {
+      //     headers: {},
+      //     params: {},
+      //     body: {
+      //       emailOrPhone: 'admin@gmail.com',
+      //       password: 'admin',
+      //     },
+      //   },
+      // );
+      // console.log(ans);
 
       let bearerToken =
         socket.handshake.auth.token || socket.handshake.headers.authorization;
@@ -71,12 +71,40 @@ export class SocketGateway implements OnModuleInit {
     });
   }
 
-  // chat realtime
   @UseGuards(WsGuard)
-  @SubscribeMessage('send-message')
-  async chatMesage(@MessageBody() data: any, @Request() req) {
-    const { receiverId, ...createMessageDto } = data;
+  @SubscribeMessage('check-in')
+  async checkIn(@MessageBody() data: any, @Request() req) {
+    // const { roomId, expectedCheckIn, expectedCheckOut, services } = data;
+    const checkIn = await this.httpService.post(
+      `${BACKEND_SERVICE}/api/v1/booking/create`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `bearer ${req['user'].id}`,
+        },
+        params: {},
+        body: data,
+      },
+    );
+    this.server.emit('receive-check-in', checkIn);
+  }
 
-    // this.server.emit('receive-message', newMessage);
+  @UseGuards(WsGuard)
+  @SubscribeMessage('check-out')
+  async checkOut(@MessageBody() data: any, @Request() req) {
+    const { bookingId } = data;
+    // const { roomId, expectedCheckIn, expectedCheckOut, services } = data;
+    const checkOut = await this.httpService.post(
+      `${BACKEND_SERVICE}/api/v1/booking/check-out/${bookingId}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `bearer ${req['user'].id}`,
+        },
+        params: {},
+        body: {},
+      },
+    );
+    this.server.emit('receive-check-out', checkOut);
   }
 }
