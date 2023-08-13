@@ -1,1 +1,1 @@
-export const JWT_KEY = 'truonghung';
+export const JWT_KEY = '52344E62DC399D1A15AC51A65F1DE';
