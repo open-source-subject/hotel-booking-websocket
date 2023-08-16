@@ -39,7 +39,6 @@ export class SocketGateway implements OnModuleInit {
       let bearerToken =
         socket.handshake.auth.token || socket.handshake.headers.authorization;
       bearerToken = bearerToken?.split(' ')[1];
-
       if (!bearerToken) {
         this.server.disconnectSockets();
         return;
@@ -69,18 +68,27 @@ export class SocketGateway implements OnModuleInit {
   @UseGuards(WsGuard)
   @SubscribeMessage('check-in')
   async checkIn(@MessageBody() data: any, @Request() req) {
-    // const checkIn = await this.httpService.post(
-    //   `${BACKEND_SERVICE}/api/v1/booking/create`,
-    //   {
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       Authorization: `Bearer ${req['user'].id}`,
-    //     },
-    //     params: {},
-    //     body: data,
-    //   },
-    // );
-    // this.server.emit('receive-check-in', checkIn);
+    console.log(data);
+    console.log(`Bearer ${req['token']}`);
+    try {
+      const checkIn = await this.httpService.post(
+        `${BACKEND_SERVICE}/api/v1/booking/create`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${req['token']}`,
+          },
+          params: {},
+          body: data,
+        },
+      );
+      if (checkIn.data?.status === 'SUCCESS') {
+        const result = checkIn.data;
+        this.server.emit('receive-check-in', result);
+      }
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   @UseGuards(WsGuard)
@@ -92,12 +100,17 @@ export class SocketGateway implements OnModuleInit {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${req['user'].id}`,
+          Authorization: `Bearer ${req['token']}`,
         },
         params: {},
         body: {},
       },
     );
     this.server.emit('receive-check-out', checkOut);
+  }
+
+  @SubscribeMessage('test')
+  async test(@MessageBody() data: any) {
+    console.log(data);
   }
 }

@@ -20,20 +20,6 @@ export class WsGuard implements CanActivate {
 
     bearerToken = bearerToken?.split(' ')[1];
     try {
-      const verifyToken = await this.httpService.post(
-        `${BACKEND_SERVICE}/api/v1/auth/verify-token`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          params: {
-            token: bearerToken,
-          },
-          body: {},
-        },
-      );
-      console.log(verifyToken.data);
-
       return new Promise((resolve, reject) => {
         return this.httpService
           .post(`${BACKEND_SERVICE}/api/v1/auth/verify-token`, {
@@ -41,13 +27,14 @@ export class WsGuard implements CanActivate {
               'Content-Type': 'application/json',
             },
             params: {
-              token:
-                'gaeyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4NGM0MTQxNi0yM2QyLTRkYzItODM5OS1lOTFjMmJjMWVjM2YiLCJpYXQiOjE2OTE5MTQ3MjYsImV4cCI6MTY5MTkzNjMyNn0.DlalkqcBBATyRHGHRDWL34XPbax9dOPnIbAkZLl0d0w',
+              token: bearerToken,
             },
             body: {},
           })
           .then((result) => {
             if (result.data.status === 'SUCCESS') {
+              request['token'] = bearerToken;
+              console.log(' bearerToken', bearerToken);
               resolve(result.data);
             }
             reject(false);
